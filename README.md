@@ -1,5 +1,7 @@
 # Odoo MCP Installer for Claude Desktop
 
+**[⬇ Download the latest release](https://github.com/t-bergervoet/odoo-mcp-installer/releases/latest)** — grab the `.zip`, unzip it, double-click `Install-OdooMCP.bat`.
+
 A one-click Windows installer for the [Odoo MCP server](https://github.com/pantalytics/odoo-mcp-pro), which lets Claude Desktop query and update your Odoo ERP data directly from chat (contacts, sales orders, inventory, invoices, etc.).
 
 This tool exists because getting that server working by hand involves installing Python, installing Git, installing the package, and hand-editing a JSON config file correctly — all things that are easy to get subtly wrong. This installer does all of it for you, with a small GUI to enter your Odoo credentials and a built-in connection test before anything is written to disk.
