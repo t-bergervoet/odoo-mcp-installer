@@ -1,0 +1,49 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Pester 5+
+        shell: pwsh
+        run: |
+          Install-Module -Name Pester -MinimumVersion 5.0 -Force -SkipPublisherCheck -Scope CurrentUser
+
+      - name: Run tests
+        shell: pwsh
+        env:
+          # Optional: set these as repository secrets to also run the live
+          # integration suite (real Python/Git download + real Odoo auth)
+          # against a disposable test Odoo instance. Without them, only the
+          # unit tests run and the integration Describe block is skipped --
+          # this is the safe default for forks and PRs from outside
+          # contributors, who won't have access to repo secrets anyway.
+          ODOO_MCP_TEST_URL: ${{ secrets.ODOO_MCP_TEST_URL }}
+          ODOO_MCP_TEST_API_KEY: ${{ secrets.ODOO_MCP_TEST_API_KEY }}
+          ODOO_MCP_TEST_USER: ${{ secrets.ODOO_MCP_TEST_USER }}
+          ODOO_MCP_TEST_DB: ${{ secrets.ODOO_MCP_TEST_DB }}
+        run: |
+          Import-Module Pester -MinimumVersion 5.0 -Force
+          $config = New-PesterConfiguration
+          $config.Run.Path = "tests/OdooMcpInstaller.Tests.ps1"
+          $config.Run.Exit = $true
+          $config.Output.Verbosity = "Detailed"
+          $config.TestResult.Enabled = $true
+          $config.TestResult.OutputPath = "testResults.xml"
+          Invoke-Pester -Configuration $config
+
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pester-test-results
+          path: testResults.xml

@@ -26,7 +26,7 @@ No admin rights required. No pre-installed Python or Git required.
 
 ## Usage
 
-1. Download this repository (or just `Install-OdooMCP.ps1` and `Install-OdooMCP.bat`) onto the target machine, keeping both files in the same folder.
+1. Download this repository (or at minimum `Install-OdooMCP.ps1`, `Install-OdooMCP.bat`, and `OdooMcpInstaller.psm1`) onto the target machine, keeping all three files in the same folder — the `.ps1` imports the `.psm1` from its own folder.
 2. Double-click **`Install-OdooMCP.bat`**.
    - If Windows shows a SmartScreen warning (because the script isn't code-signed), click **More info → Run anyway**.
 3. Fill in the fields:
@@ -43,7 +43,30 @@ No admin rights required. No pre-installed Python or Git required.
 
 ## Deploying to multiple machines
 
-Just copy the two files (or this whole folder) to each machine and repeat the steps above — each machine gets its own private Python/Git install and its own credentials. There's nothing to install centrally or license per-seat.
+Just copy this folder to each machine and repeat the steps above — each machine gets its own private Python/Git install and its own credentials. There's nothing to install centrally or license per-seat.
+
+## Testing
+
+The installable logic lives in [`OdooMcpInstaller.psm1`](OdooMcpInstaller.psm1), kept separate from the GUI (`Install-OdooMCP.ps1`) specifically so it can be tested with [Pester](https://pester.dev/) independent of any UI. Tests live in [`tests/OdooMcpInstaller.Tests.ps1`](tests/OdooMcpInstaller.Tests.ps1).
+
+**Unit tests** (no network access, run in a few seconds) cover config-file merging/recovery and output-parsing logic:
+
+```powershell
+Install-Module Pester -MinimumVersion 5.0 -Force -SkipPublisherCheck
+Invoke-Pester -Path .\tests\OdooMcpInstaller.Tests.ps1 -Output Detailed
+```
+
+**Integration tests** exercise the real, full install path end-to-end: downloading a throwaway Python and Git into a temp directory, installing the actual package from GitHub, authenticating against a real Odoo instance, and writing a config file — this is what actually proves the "fresh Windows PC" scenario works, and it's also the regression test for the "Test Connection hangs forever" bug (asserts a successful auth resolves in well under the function's internal timeout). They're skipped automatically unless you provide credentials for a test Odoo instance:
+
+```powershell
+$env:ODOO_MCP_TEST_URL = "https://your-test-instance.odoo.com"
+$env:ODOO_MCP_TEST_API_KEY = "..."
+$env:ODOO_MCP_TEST_USER = "you@example.com"
+$env:ODOO_MCP_TEST_DB = "your-test-db"          # optional
+Invoke-Pester -Path .\tests\OdooMcpInstaller.Tests.ps1 -Output Detailed
+```
+
+CI ([`.github/workflows/test.yml`](.github/workflows/test.yml)) runs the unit tests on every push and pull request on a clean `windows-latest` runner. If you add `ODOO_MCP_TEST_URL`/`ODOO_MCP_TEST_API_KEY`/`ODOO_MCP_TEST_USER`/`ODOO_MCP_TEST_DB` as repository secrets (pointing at a disposable test Odoo instance), CI will also run the full integration suite automatically.
 
 ## Troubleshooting
 
@@ -63,6 +86,9 @@ Claude Desktop writes MCP server logs to:
 %LOCALAPPDATA%\Claude\logs\mcp.log
 ```
 These show the exact startup/auth errors if something still isn't working after following the steps above.
+
+**"Test Connection" or "Install" window freezes/hangs (fixed in v1.0.1)**
+If you're on an older copy of this installer: when authentication actually succeeds, the Odoo MCP server process stays running (it waits on stdio for a client), so reading its output until the process closed would wait forever. v1.0.1+ reads output asynchronously and kills the process as soon as a conclusive result is seen, instead of waiting for it to exit. Update to the [latest release](https://github.com/t-bergervoet/odoo-mcp-installer/releases/latest) if you hit this.
 
 **Re-running the installer**
 Safe to run again — it detects the existing Python/Git/package install and skips reinstalling them, and it merges into the existing config rather than overwriting other MCP servers.
